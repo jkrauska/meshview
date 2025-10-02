@@ -405,13 +405,13 @@ async def inspect_packets(
 
                 # Process and display each packet
                 for i, packet in enumerate(packets, 1):
-                    print(colorize(f"Packet #{i} (ID: {packet.id})", Colors.YELLOW, bold=True))
+                    print(colorize(f"Packet   #{i} (ID: {packet.id})", Colors.YELLOW, bold=True))
                     print(colorize('─' * 80, Colors.GRAY))
 
                     # Basic packet info
-                    print(f"{colorize('Time:', Colors.BLUE)} {packet.import_time}")
+                    print(f"{colorize('Time:   ', Colors.BLUE)} {packet.import_time}")
                     port_name = portnum_name(packet.portnum)
-                    print(f"{colorize('Port:', Colors.BLUE)} {colorize(port_name, Colors.MAGENTA)} ({packet.portnum})")
+                    print(f"{colorize('Port:   ', Colors.BLUE)} {colorize(port_name, Colors.MAGENTA)} ({packet.portnum})")
 
                     # Format From field with decimal and hex
                     from_node_name = format_node_info(packet.from_node, packet.from_node_id)
@@ -421,7 +421,7 @@ async def inspect_packets(
                         else "[N/A]"
                     )
                     print(
-                        f"{colorize('From:', Colors.BLUE)} {colorize(from_node_name, Colors.GREEN)} {colorize(from_id_str, Colors.GRAY)}"
+                        f"{colorize('From:   ', Colors.BLUE)} {colorize(from_node_name, Colors.GREEN)} {colorize(from_id_str, Colors.GRAY)}"
                     )
 
                     # Format To field with decimal and hex
@@ -433,7 +433,7 @@ async def inspect_packets(
                     )
                     to_color = Colors.RED if packet.to_node_id == 0xFFFFFFFF else Colors.GREEN
                     print(
-                        f"{colorize('To:', Colors.BLUE)} {colorize(to_node_name, to_color)} {colorize(to_id_str, Colors.GRAY)}"
+                        f"{colorize('To:     ', Colors.BLUE)} {colorize(to_node_name, to_color)} {colorize(to_id_str, Colors.GRAY)}"
                     )
 
                     if packet.channel:
