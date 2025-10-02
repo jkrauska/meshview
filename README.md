@@ -403,4 +403,17 @@ Add schedule to the bottom of the file (modify /path/to/file/ to the correct pat
 
 Check the log file to see it the script run at the specific time.
 
+---
 
+## Packet Inspection Tools
+
+Standalone CLI tools are available for inspecting and analyzing packet data from the database without running the full web server. See [README-packet-tools.md](README-packet-tools.md) for detailed documentation.
+
+Quick example:
+```bash
+# Inspect last 100 packets
+./env/bin/python inspect_packets.py packets.db
+
+# Show only text messages
+./env/bin/python inspect_packets.py packets.db --portnum 1
+```
