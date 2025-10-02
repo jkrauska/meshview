@@ -16,15 +16,22 @@ cleanup_logger = logging.getLogger("dbcleanup")
 cleanup_logger.setLevel(logging.INFO)
 file_handler = logging.FileHandler("dbcleanup.log")
 file_handler.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
+formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
 file_handler.setFormatter(formatter)
 cleanup_logger.addHandler(file_handler)
+
 
 # -------------------------
 # Helper functions
 # -------------------------
 def get_bool(config, section, key, default=False):
-    return str(config.get(section, {}).get(key, default)).lower() in ("1", "true", "yes", "on")
+    return str(config.get(section, {}).get(key, default)).lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
 
 def get_int(config, section, key, default=0):
     try:
@@ -32,19 +39,18 @@ def get_int(config, section, key, default=0):
     except ValueError:
         return default
 
+
 # -------------------------
 # Shared DB lock
 # -------------------------
 db_lock = asyncio.Lock()
 
+
 # -------------------------
 # Database cleanup using ORM
 # -------------------------
 async def daily_cleanup_at(
-    hour: int = 2,
-    minute: int = 0,
-    days_to_keep: int = 14,
-    vacuum_db: bool = True
+    hour: int = 2, minute: int = 0, days_to_keep: int = 14, vacuum_db: bool = True
 ):
     while True:
         now = datetime.datetime.now()
@@ -56,7 +62,9 @@ async def daily_cleanup_at(
         await asyncio.sleep(delay)
 
         # Local-time cutoff as string for SQLite DATETIME comparison
-        cutoff = (datetime.datetime.now() - datetime.timedelta(days=days_to_keep)).strftime("%Y-%m-%d %H:%M:%S")
+        cutoff = (
+            datetime.datetime.now() - datetime.timedelta(days=days_to_keep)
+        ).strftime("%Y-%m-%d %H:%M:%S")
         cleanup_logger.info(f"Running cleanup for records older than {cutoff}...")
 
         try:
@@ -76,17 +84,25 @@ async def daily_cleanup_at(
                     # PacketSeen
                     # -------------------------
                     result = await session.execute(
-                        delete(models.PacketSeen).where(models.PacketSeen.import_time < cutoff)
+                        delete(models.PacketSeen).where(
+                            models.PacketSeen.import_time < cutoff
+                        )
                     )
-                    cleanup_logger.info(f"Deleted {result.rowcount} rows from PacketSeen")
+                    cleanup_logger.info(
+                        f"Deleted {result.rowcount} rows from PacketSeen"
+                    )
 
                     # -------------------------
                     # Traceroute
                     # -------------------------
                     result = await session.execute(
-                        delete(models.Traceroute).where(models.Traceroute.import_time < cutoff)
+                        delete(models.Traceroute).where(
+                            models.Traceroute.import_time < cutoff
+                        )
                     )
-                    cleanup_logger.info(f"Deleted {result.rowcount} rows from Traceroute")
+                    cleanup_logger.info(
+                        f"Deleted {result.rowcount} rows from Traceroute"
+                    )
 
                     # -------------------------
                     # Node
@@ -110,6 +126,7 @@ async def daily_cleanup_at(
         except Exception as e:
             cleanup_logger.error(f"Error during cleanup: {e}")
 
+
 # -------------------------
 # MQTT loading
 # -------------------------
@@ -118,13 +135,14 @@ async def load_database_from_mqtt(
     mqtt_port: int,
     topics: list,
     mqtt_user: str | None = None,
-    mqtt_passwd: str | None = None
+    mqtt_passwd: str | None = None,
 ):
     async for topic, env in mqtt_reader.get_topic_envelopes(
         mqtt_server, mqtt_port, topics, mqtt_user, mqtt_passwd
     ):
         async with db_lock:  # Block if cleanup is running
             await mqtt_store.process_envelope(topic, env)
+
 
 # -------------------------
 # Main function
@@ -162,8 +180,9 @@ async def main():
         else:
             cleanup_logger.info("Daily cleanup is disabled by configuration.")
 
+
 # -------------------------
 # Entry point
 # -------------------------
-if __name__ == '__main__':
+if __name__ == "__main__":
     asyncio.run(main())

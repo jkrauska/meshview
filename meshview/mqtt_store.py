@@ -1,17 +1,15 @@
 import datetime
 import re
 from sqlalchemy import select
-from sqlalchemy import update
 from meshtastic.protobuf.config_pb2 import Config
 from meshtastic.protobuf.portnums_pb2 import PortNum
-from meshtastic.protobuf.mesh_pb2 import User, HardwareModel
+from meshtastic.protobuf.mesh_pb2 import HardwareModel
 from meshview import mqtt_database
 from meshview import decode_payload
 from meshview.models import Packet, PacketSeen, Node, Traceroute
 
 
 async def process_envelope(topic, env):
-
     # Checking if the received packet is a MAP_REPORT
     if env.packet.decoded.portnum == PortNum.MAP_REPORT_APP:
         node_id = getattr(env.packet, "from")
@@ -72,9 +70,7 @@ async def process_envelope(topic, env):
         return
 
     async with mqtt_database.async_session() as session:
-        result = await session.execute(
-            select(Packet).where(Packet.id == env.packet.id)
-        )
+        result = await session.execute(select(Packet).where(Packet.id == env.packet.id))
         new_packet = False
         packet = result.scalar_one_or_none()
         if not packet:
@@ -136,9 +132,7 @@ async def process_envelope(topic, env):
                     )
 
                     node = (
-                        await session.execute(
-                            select(Node).where(Node.id == user.id)
-                        )
+                        await session.execute(select(Node).where(Node.id == user.id))
                     ).scalar_one_or_none()
 
                     if node:
