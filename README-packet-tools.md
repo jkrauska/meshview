@@ -81,13 +81,23 @@ source env/bin/activate
 
 #### JSON Output
 
+The tool provides beautifully formatted JSON output with automatic syntax highlighting when outputting to a terminal.
+
 ```bash
-# Get packets in JSON format
+# Get packets in JSON format (with color syntax highlighting in terminal)
 ./env/bin/python inspect_packets.py packets.db --json
 
 # Get last 10 text messages as JSON
 ./env/bin/python inspect_packets.py packets.db --portnum 1 -n 10 --json
+
+# Pipe to file (colors automatically disabled)
+./env/bin/python inspect_packets.py packets.db --json > output.json
+
+# Pipe to jq for advanced filtering
+./env/bin/python inspect_packets.py packets.db --json | jq '.packets[0]'
 ```
+
+**Note:** Color syntax highlighting is automatically enabled when outputting to a terminal and disabled when piping to files or other commands. This uses the `pygments` library for beautiful, readable JSON output.
 
 #### Getting Help
 

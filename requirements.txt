@@ -24,6 +24,9 @@ MarkupSafe~=3.0.2
 # Graphs / diagrams
 pydot~=3.0.4
 
+# Syntax highlighting
+pygments~=2.18.0
+
 
 #############################
 # Development / Analysis / Debugging

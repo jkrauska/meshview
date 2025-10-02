@@ -11,6 +11,45 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+try:
+    from pygments import highlight
+    from pygments.lexers import JsonLexer
+    from pygments.formatters import TerminalFormatter
+    PYGMENTS_AVAILABLE = True
+except ImportError:
+    PYGMENTS_AVAILABLE = False
+
+
+# ANSI color codes for terminal output
+class Colors:
+    """ANSI color codes for terminal output."""
+    RESET = '\033[0m'
+    BOLD = '\033[1m'
+    
+    # Colors
+    RED = '\033[91m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    BLUE = '\033[94m'
+    MAGENTA = '\033[95m'
+    CYAN = '\033[96m'
+    WHITE = '\033[97m'
+    GRAY = '\033[90m'
+    
+    # Bright colors
+    BRIGHT_GREEN = '\033[92m'
+    BRIGHT_BLUE = '\033[94m'
+    BRIGHT_CYAN = '\033[96m'
+    BRIGHT_MAGENTA = '\033[95m'
+
+
+def colorize(text, color, bold=False):
+    """Add color to text if output is a TTY."""
+    if sys.stdout.isatty():
+        prefix = Colors.BOLD if bold else ''
+        return f"{prefix}{color}{text}{Colors.RESET}"
+    return text
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
@@ -48,6 +87,8 @@ def format_node_info(node, node_id=None):
 
 def packet_to_dict(packet, mesh_packet=None, decoded_payload=None):
     """Convert packet to dictionary for JSON output."""
+    payload_size = len(packet.payload) if packet.payload else 0
+    
     packet_dict = {
         "id": packet.id,
         "time": packet.import_time.isoformat() if packet.import_time else None,
@@ -68,6 +109,7 @@ def packet_to_dict(packet, mesh_packet=None, decoded_payload=None):
             else False,
         },
         "channel": packet.channel,
+        "payload_size": payload_size,
         "decoded_payload": None,
     }
 
@@ -172,12 +214,19 @@ def packet_to_dict(packet, mesh_packet=None, decoded_payload=None):
     return packet_dict
 
 
+def format_json_with_color(json_str):
+    """Format JSON string with syntax highlighting if pygments is available."""
+    if PYGMENTS_AVAILABLE and sys.stdout.isatty():
+        return highlight(json_str, JsonLexer(), TerminalFormatter())
+    return json_str
+
+
 def format_payload(mesh_packet, decoded_payload, portnum, payload_size=None):
-    """Format decoded payload for display."""
+    """Format decoded payload for display with color."""
     if decoded_payload is None:
         if payload_size:
-            return f"  [Payload could not be decoded]\n  Payload Size: {payload_size} bytes"
-        return "  [Payload could not be decoded]"
+            return f"{colorize('  [Payload could not be decoded]', Colors.RED)}\n  Payload Size: {payload_size} bytes"
+        return colorize("  [Payload could not be decoded]", Colors.RED)
 
     lines = []
     portnum_str = portnum_name(portnum)
@@ -188,82 +237,82 @@ def format_payload(mesh_packet, decoded_payload, portnum, payload_size=None):
             if isinstance(decoded_payload, str)
             else len(decoded_payload)
         )
-        lines.append(f"  Text Message:")
+        lines.append(colorize(f"  Text Message:", Colors.MAGENTA))
         lines.append(f"    Size: {msg_size} bytes")
-        lines.append(f"    Message: {decoded_payload}")
+        lines.append(f"    Message: {colorize(decoded_payload, Colors.WHITE, bold=True)}")
 
     elif portnum == PortNum.POSITION_APP:
         lat = decoded_payload.latitude_i / 1e7 if decoded_payload.latitude_i else None
         lon = decoded_payload.longitude_i / 1e7 if decoded_payload.longitude_i else None
         alt = decoded_payload.altitude if decoded_payload.altitude else None
-        lines.append(f"  Position:")
+        lines.append(colorize(f"  Position:", Colors.MAGENTA))
         if lat and lon:
-            lines.append(f"    Lat/Lon: {lat:.6f}, {lon:.6f}")
+            lines.append(f"    Lat/Lon: {colorize(f'{lat:.6f}, {lon:.6f}', Colors.BRIGHT_CYAN)}")
         if alt:
-            lines.append(f"    Altitude: {alt}m")
+            lines.append(f"    Altitude: {colorize(f'{alt}m', Colors.BRIGHT_CYAN)}")
 
     elif portnum == PortNum.NODEINFO_APP:
-        lines.append(f"  Node Info:")
+        lines.append(colorize(f"  Node Info:", Colors.MAGENTA))
         if decoded_payload.long_name:
-            lines.append(f"    Long Name: {decoded_payload.long_name}")
+            lines.append(f"    Long Name: {colorize(decoded_payload.long_name, Colors.GREEN)}")
         if decoded_payload.short_name:
-            lines.append(f"    Short Name: {decoded_payload.short_name}")
+            lines.append(f"    Short Name: {colorize(decoded_payload.short_name, Colors.GREEN)}")
         if decoded_payload.hw_model:
-            lines.append(f"    Hardware: {decoded_payload.hw_model}")
+            lines.append(f"    Hardware: {colorize(str(decoded_payload.hw_model), Colors.CYAN)}")
 
     elif portnum == PortNum.TELEMETRY_APP:
-        lines.append(f"  Telemetry:")
+        lines.append(colorize(f"  Telemetry:", Colors.MAGENTA))
         if decoded_payload.HasField("device_metrics"):
             dm = decoded_payload.device_metrics
             if dm.battery_level:
-                lines.append(f"    Battery: {dm.battery_level}%")
+                lines.append(f"    Battery: {colorize(f'{dm.battery_level}%', Colors.BRIGHT_GREEN)}")
             if dm.voltage:
-                lines.append(f"    Voltage: {dm.voltage}V")
+                lines.append(f"    Voltage: {colorize(f'{dm.voltage}V', Colors.BRIGHT_GREEN)}")
             if dm.channel_utilization:
-                lines.append(f"    Channel Utilization: {dm.channel_utilization}%")
+                lines.append(f"    Channel Utilization: {colorize(f'{dm.channel_utilization}%', Colors.YELLOW)}")
             if dm.air_util_tx:
-                lines.append(f"    Air Utilization TX: {dm.air_util_tx}%")
+                lines.append(f"    Air Utilization TX: {colorize(f'{dm.air_util_tx}%', Colors.YELLOW)}")
         if decoded_payload.HasField("environment_metrics"):
             em = decoded_payload.environment_metrics
             if em.temperature:
-                lines.append(f"    Temperature: {em.temperature}°C")
+                lines.append(f"    Temperature: {colorize(f'{em.temperature}°C', Colors.BRIGHT_CYAN)}")
             if em.relative_humidity:
-                lines.append(f"    Humidity: {em.relative_humidity}%")
+                lines.append(f"    Humidity: {colorize(f'{em.relative_humidity}%', Colors.BRIGHT_CYAN)}")
             if em.barometric_pressure:
-                lines.append(f"    Pressure: {em.barometric_pressure} hPa")
+                lines.append(f"    Pressure: {colorize(f'{em.barometric_pressure} hPa', Colors.BRIGHT_CYAN)}")
 
     elif portnum == PortNum.TRACEROUTE_APP:
-        lines.append(f"  Traceroute:")
+        lines.append(colorize(f"  Traceroute:", Colors.MAGENTA))
         if decoded_payload.route:
-            route_nodes = [hex(node_id) for node_id in decoded_payload.route]
+            route_nodes = [colorize(hex(node_id), Colors.GREEN) for node_id in decoded_payload.route]
             lines.append(f"    Route: {' -> '.join(route_nodes)}")
 
     elif portnum == PortNum.NEIGHBORINFO_APP:
-        lines.append(f"  Neighbor Info:")
+        lines.append(colorize(f"  Neighbor Info:", Colors.MAGENTA))
         if decoded_payload.neighbors:
             lines.append(f"    Neighbors: {len(decoded_payload.neighbors)}")
             for neighbor in decoded_payload.neighbors[:5]:  # Show first 5
-                lines.append(f"      {hex(neighbor.node_id)} (SNR: {neighbor.snr})")
+                lines.append(f"      {colorize(hex(neighbor.node_id), Colors.GREEN)} (SNR: {colorize(str(neighbor.snr), Colors.CYAN)})")
 
     elif portnum == PortNum.ROUTING_APP:
-        lines.append(f"  Routing:")
+        lines.append(colorize(f"  Routing:", Colors.MAGENTA))
         if decoded_payload.HasField("error_reason"):
-            lines.append(f"    Error: {decoded_payload.error_reason}")
+            lines.append(f"    Error: {colorize(str(decoded_payload.error_reason), Colors.RED)}")
 
     else:
         if payload_size:
-            lines.append(f"  {portnum_str}:")
+            lines.append(colorize(f"  {portnum_str}:", Colors.MAGENTA))
             lines.append(f"    Payload Size: {payload_size} bytes")
         else:
             lines.append(
-                f"  {portnum_str}: [Raw payload size: {len(str(decoded_payload))} bytes]"
+                colorize(f"  {portnum_str}: [Raw payload size: {len(str(decoded_payload))} bytes]", Colors.GRAY)
             )
 
-    return "\n".join(lines) if lines else f"  {portnum_str}"
+    return "\n".join(lines) if lines else colorize(f"  {portnum_str}", Colors.MAGENTA)
 
 
 async def inspect_packets(
-    database_path, count=100, portnum_filter=None, node_filter=None, exclude_node=None, json_output=False
+    database_path, count=100, portnum_filter=None, node_filter=None, exclude_node=None, channel_filter=None, json_output=False
 ):
     """
     Inspect the last N packets from the database.
@@ -274,6 +323,7 @@ async def inspect_packets(
         portnum_filter: Optional portnum to filter by
         node_filter: Optional node_id to filter by (from or to)
         exclude_node: Optional node_id to exclude (from or to)
+        channel_filter: Optional channel name to filter by
         json_output: Output in JSON format
     """
     # Create read-only database connection
@@ -313,6 +363,9 @@ async def inspect_packets(
                     (Packet.from_node_id != exclude_node)
                     & (Packet.to_node_id != exclude_node)
                 )
+            
+            if channel_filter is not None:
+                query = query.where(Packet.channel == channel_filter)
 
             # Order by most recent and limit
             query = query.order_by(Packet.import_time.desc()).limit(count)
@@ -342,64 +395,69 @@ async def inspect_packets(
                     packets_list.append(packet_dict)
 
                 output = {"count": len(packets), "packets": packets_list}
-                print(json.dumps(output, indent=2))
+                json_str = json.dumps(output, indent=2)
+                print(format_json_with_color(json_str))
             else:
                 # Text output mode
-                print(f"\n{'=' * 80}")
-                print(f"Found {len(packets)} packet(s)")
-                print(f"{'=' * 80}\n")
+                print(f"\n{colorize('=' * 80, Colors.CYAN)}")
+                print(colorize(f"Found {len(packets)} packet(s)", Colors.CYAN, bold=True))
+                print(f"{colorize('=' * 80, Colors.CYAN)}\n")
 
                 # Process and display each packet
                 for i, packet in enumerate(packets, 1):
-                    print(f"Packet #{i} (ID: {packet.id})")
-                    print(f"{'─' * 80}")
+                    print(colorize(f"Packet #{i} (ID: {packet.id})", Colors.YELLOW, bold=True))
+                    print(colorize('─' * 80, Colors.GRAY))
 
                     # Basic packet info
-                    print(f"Time: {packet.import_time}")
-                    print(f"Port: {portnum_name(packet.portnum)} ({packet.portnum})")
+                    print(f"{colorize('Time:', Colors.BLUE)} {packet.import_time}")
+                    port_name = portnum_name(packet.portnum)
+                    print(f"{colorize('Port:', Colors.BLUE)} {colorize(port_name, Colors.MAGENTA)} ({packet.portnum})")
 
                     # Format From field with decimal and hex
+                    from_node_name = format_node_info(packet.from_node, packet.from_node_id)
                     from_id_str = (
                         f"[{packet.from_node_id} / {hex(packet.from_node_id)}]"
                         if packet.from_node_id
                         else "[N/A]"
                     )
                     print(
-                        f"From: {format_node_info(packet.from_node, packet.from_node_id)} {from_id_str}"
+                        f"{colorize('From:', Colors.BLUE)} {colorize(from_node_name, Colors.GREEN)} {colorize(from_id_str, Colors.GRAY)}"
                     )
 
                     # Format To field with decimal and hex
+                    to_node_name = format_node_info(packet.to_node, packet.to_node_id)
                     to_id_str = (
                         f"[{packet.to_node_id} / {hex(packet.to_node_id)}]"
                         if packet.to_node_id
                         else "[N/A]"
                     )
+                    to_color = Colors.RED if packet.to_node_id == 0xFFFFFFFF else Colors.GREEN
                     print(
-                        f"To: {format_node_info(packet.to_node, packet.to_node_id)} {to_id_str}"
+                        f"{colorize('To:', Colors.BLUE)} {colorize(to_node_name, to_color)} {colorize(to_id_str, Colors.GRAY)}"
                     )
 
                     if packet.channel:
-                        print(f"Channel: {packet.channel}")
+                        print(f"{colorize('Channel:', Colors.BLUE)} {colorize(packet.channel, Colors.CYAN, bold=True)}")
 
                     # Decode protobuf payload
                     if packet.payload:
                         payload_size = len(packet.payload)
                         mesh_packet, decoded_payload = decode(packet)
                         if mesh_packet:
-                            print(f"\nDecoded Payload:")
+                            print(f"\n{colorize('Decoded Payload:', Colors.YELLOW)}")
                             print(
                                 format_payload(
                                     mesh_packet, decoded_payload, packet.portnum, payload_size
                                 )
                             )
                         else:
-                            print(f"\nDecoded Payload:")
-                            print(f"  [Payload could not be decoded]")
+                            print(f"\n{colorize('Decoded Payload:', Colors.YELLOW)}")
+                            print(colorize("  [Payload could not be decoded]", Colors.RED))
                             print(f"  Payload Size: {payload_size} bytes")
                     else:
-                        print(f"\n[No payload]")
+                        print(f"\n{colorize('[No payload]', Colors.GRAY)}")
 
-                    print(f"\n{'=' * 80}\n")
+                    print(f"\n{colorize('=' * 80, Colors.CYAN)}\n")
 
             return 0
 
@@ -430,6 +488,9 @@ Examples:
   
   # Show packets from/to specific node
   %(prog)s packets.db --node 0x123456
+  
+  # Show packets from specific channel
+  %(prog)s packets.db --channel LongFast
   
 Port Numbers:
   0  = UNKNOWN_APP
@@ -476,6 +537,13 @@ Port Numbers:
         type=lambda x: int(x, 0),  # Supports hex (0x123) or decimal
         help="Exclude packets from/to node ID, supports hex (0x123) or decimal",
     )
+    
+    parser.add_argument(
+        "-c",
+        "--channel",
+        type=str,
+        help="Filter by channel name (e.g., 'LongFast', 'ShortFast')",
+    )
 
     parser.add_argument("--json", action="store_true", help="Output in JSON format")
 
@@ -489,6 +557,7 @@ Port Numbers:
             portnum_filter=args.portnum,
             node_filter=args.node,
             exclude_node=args.exclude_node,
+            channel_filter=args.channel,
             json_output=args.json,
         )
     )
